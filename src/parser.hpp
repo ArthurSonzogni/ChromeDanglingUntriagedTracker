@@ -8,40 +8,27 @@
 #ifndef CHROME_DANGLING_UNTRIAGED_TRACKER_PARSER_HPP
 #define CHROME_DANGLING_UNTRIAGED_TRACKER_PARSER_HPP
 
+#include <functional>
 #include <string>
-#include <vector>
+#include <string_view>
 
-struct Line {
-  enum Type { Keep, Add, Delete };
-  Type type;
-  std::string content;
-};
-
-struct Hunk {
-  int left_start;
-  int right_start;
-  std::vector<Line> lines;
-};
-
-struct File {
-  std::string left_file;
-  std::string right_file;
-  std::vector<Hunk> hunks;
-};
-
-struct Commit {
+struct CommitReport {
   std::string hash;
-  std::string title;
-  std::string tree;
   std::string timestamp;
-  std::vector<std::string> authors;
-  std::vector<std::string> body;
-  std::vector<std::string> committers;
-  std::vector<std::string> parents;
+  std::string author;
+  std::string title;
+  int added = 0;
+  int removed = 0;
+  int added_test = 0;
+  int removed_test = 0;
+
+  constexpr bool is_empty() const {
+    return added == 0 && removed == 0 && added_test == 0 && removed_test == 0;
+  }
 };
 
-std::string ResolveHead();
-Commit GetCommit(std::string hash);
-std::vector<File> GetFiles(const Commit& commit);
+void TrackDanglingUntriaged(
+    std::string_view last_hash,
+    const std::function<void(const CommitReport&)>& on_commit);
 
 #endif  // CHROME_DANGLING_UNTRIAGED_TRACKER_PARSER_HPP

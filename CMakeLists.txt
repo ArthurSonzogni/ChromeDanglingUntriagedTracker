@@ -50,7 +50,7 @@ if (NOT MSVC)
 endif()
 
 set_target_properties(chrome-dangling-untriaged-tracker
-  PROPERTIES CXX_STANDARD 17)
+  PROPERTIES CXX_STANDARD 20)
 
 install(TARGETS chrome-dangling-untriaged-tracker
   RUNTIME DESTINATION "bin")
