@@ -70,7 +70,7 @@ void TrackDanglingUntriaged(
     std::string_view last_hash,
     const std::function<void(const CommitReport&)>& on_commit) {
   std::string range;
-  if (!last_hash.empty() && last_hash != "empty") {
+  if (!last_hash.empty() && last_hash != "empty" && last_hash != "initial") {
     range = std::string(last_hash) + "..HEAD";
   } else {
     auto check_rev = subprocess::run(
