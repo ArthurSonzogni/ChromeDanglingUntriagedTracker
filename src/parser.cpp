@@ -5,6 +5,7 @@
 #include "parser.hpp"
 
 #include <algorithm>
+#include <array>
 #include <string>
 #include <string_view>
 
@@ -13,6 +14,12 @@
 #include "subprocess/pipe.hpp"
 
 namespace {
+
+constexpr std::array<std::string_view, 3> kInitialCommits = {
+    "4c9cdacbe6ebc7a1b5092c5e34fd1b932d4a0bdb",  // Chrome
+    "7379e22d00877bac1c5348d31f5e45cdcc2f3aaf",  // Dawn
+    "7c03aed333548838f3442e332b6afd2c4bcc3574",  // ANGLE
+};
 
 inline bool MatchesDanglingPtr(std::string_view content) {
   if (content.find("raw_") == std::string_view::npos) {
@@ -69,21 +76,22 @@ class StreamLineReader {
 void TrackDanglingUntriaged(
     std::string_view last_hash,
     const std::function<void(const CommitReport&)>& on_commit) {
-  std::string range;
+  std::string range = "HEAD";
   if (!last_hash.empty() && last_hash != "empty" && last_hash != "initial") {
     range = std::string(last_hash) + "..HEAD";
   } else {
-    auto check_rev = subprocess::run(
-        {"git", "rev-parse", "--verify", "-q",
-         "4c9cdacbe6ebc7a1b5092c5e34fd1b932d4a0bdb~1"},
-        subprocess::RunBuilder()
-            .cerr(subprocess::PipeOption::pipe)
-            .cout(subprocess::PipeOption::pipe)
-            .cin(subprocess::PipeOption::close));
-    if (check_rev.returncode == 0) {
-      range = "4c9cdacbe6ebc7a1b5092c5e34fd1b932d4a0bdb~1..HEAD";
-    } else {
-      range = "HEAD";
+    for (std::string_view initial_commit : kInitialCommits) {
+      std::string parent_rev = std::string(initial_commit) + "~1";
+      auto check_rev = subprocess::run(
+          {"git", "rev-parse", "--verify", "-q", parent_rev},
+          subprocess::RunBuilder()
+              .cerr(subprocess::PipeOption::pipe)
+              .cout(subprocess::PipeOption::pipe)
+              .cin(subprocess::PipeOption::close));
+      if (check_rev.returncode == 0) {
+        range = parent_rev + "..HEAD";
+        break;
+      }
     }
   }
 
@@ -133,8 +141,10 @@ void TrackDanglingUntriaged(
       on_commit(current_commit);
     }
 
-    if (current_commit.hash == "4c9cdacbe6ebc7a1b5092c5e34fd1b932d4a0bdb") {
-      return false;
+    for (std::string_view initial_commit : kInitialCommits) {
+      if (current_commit.hash == initial_commit) {
+        return false;
+      }
     }
 
     return true;
@@ -177,7 +187,8 @@ void TrackDanglingUntriaged(
     if (line.starts_with("+++ ")) {
       std::string_view path = line.substr(4);
       if (path != "/dev/null") {
-        is_test = (path.find("test") != std::string_view::npos);
+        is_test = (path.find("test") != std::string_view::npos ||
+                   path.find("Test") != std::string_view::npos);
       }
       continue;
     }
@@ -185,7 +196,8 @@ void TrackDanglingUntriaged(
     if (line.starts_with("--- ")) {
       std::string_view path = line.substr(4);
       if (path != "/dev/null") {
-        is_test = (path.find("test") != std::string_view::npos);
+        is_test = (path.find("test") != std::string_view::npos ||
+                   path.find("Test") != std::string_view::npos);
       }
       continue;
     }
